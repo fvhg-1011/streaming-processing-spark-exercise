@@ -2,19 +2,22 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
-schema = StructType([
-    StructField("order_id", StringType(), True),
-    StructField("customer_id", IntegerType(), True),
-    StructField("furniture", StringType(), True),
-    StructField("color", StringType(), True),
-    StructField("price", IntegerType(), True),
-    StructField("ts", LongType(), True),
-])
+schema = StructType(
+    [
+        StructField("order_id", StringType(), True),
+        StructField("customer_id", IntegerType(), True),
+        StructField("furniture", StringType(), True),
+        StructField("color", StringType(), True),
+        StructField("price", IntegerType(), True),
+        StructField("ts", LongType(), True),
+    ]
+)
 
-spark = SparkSession.builder \
-    .appName("DibimbingStreaming") \
-    .config("spark.sql.streaming.checkpointLocation", "/tmp/spark_checkpoint") \
+spark = (
+    SparkSession.builder.appName("DibimbingStreaming")
+    .config("spark.sql.streaming.checkpointLocation", "/tmp/spark_checkpoint")
     .getOrCreate()
+)
 
 spark.sparkContext.setLogLevel("ERROR")
 
@@ -38,25 +41,18 @@ windowDuration = "10 minutes"
 slideDuration = "5 minutes"
 
 running_total_df = (
-    parsed_df
-    .withWatermark("event_time", "5 minutes")
-    .groupBy(
-        window(col("event_time"), windowDuration, slideDuration)
-    )
-    .agg(
-        sum("price").alias("running_total_price")
-    )
+    parsed_df.withWatermark("event_time", "5 minutes")
+    .groupBy(window(col("event_time"), windowDuration, slideDuration))
+    .agg(sum("price").alias("running_total_price"))
     .select(
         col("window.start").alias("start_time"),
         col("window.end").alias("end_time"),
-        col("running_total_price")
+        col("running_total_price"),
     )
 )
 
 query = (
-    running_total_df
-    .writeStream
-    .outputMode("complete")
+    running_total_df.writeStream.outputMode("complete")
     .format("console")
     .option("truncate", "false")
     .option("numRows", "1000")
@@ -65,4 +61,3 @@ query = (
 
 
 query.awaitTermination()
-
